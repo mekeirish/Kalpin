@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CyberNotebook PWA</title>
+    <meta name="theme-color" content="#050505">
+    
+    <!-- React & Tailwind -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        body { margin: 0; overflow: hidden; touch-action: none; }
+        canvas { touch-action: none; }
+    </style>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#4b6cb7">
+<link rel="apple-touch-icon" href="icon.png"></head>
+<body class="bg-black">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback } = React;
+
+        const CyberNotebookApp = () => {
+            const [currentPage, setCurrentPage] = useState(0);
+            const [isDrawingMode, setIsDrawingMode] = useState(false);
+            const [selectedColor, setSelectedColor] = useState("#00f2ff");
+            const [pagesData, setPagesData] = useState({});
+            const [history, setHistory] = useState({});
+            const [historyIndex, setHistoryIndex] = useState({});
+            const [showSelector, setShowSelector] = useState(false);
+
+            const canvasRef = useRef(null);
+            const colors = ["#00f2ff", "#ff007a", "#7aff00", "#ffcc00", "#ff5e00", "#a855f7", "#ffffff", "#888888", "#000000"];
+
+            const getCoordinates = (e) => {
+                const canvas = canvasRef.current;
+                const rect = canvas.getBoundingClientRect();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                return { x: clientX - rect.left, y: clientY - rect.top };
+            };
+
+            useEffect(() => {
+                const saved = localStorage.getItem('cyberNotebook_data');
+                if (saved) setPagesData(JSON.parse(saved));
+            }, []);
+
+            useEffect(() => {
+                localStorage.setItem('cyberNotebook_data', JSON.stringify(pagesData));
+            }, [pagesData]);
+
+            const renderCanvas = useCallback((pageIdx) => {
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+                const ctx = canvas.getContext("2d");
+                ctx.fillStyle = "#0f0f12";
+                ctx.fillRect(0, 0, 360, 530);
+                ctx.strokeStyle = "#1e1e24";
+                ctx.lineWidth = 1;
+                for(let i=0; i<530; i+=20) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(360, i); ctx.stroke(); }
+                if (pagesData[pageIdx]) {
+                    const img = new Image();
+                    img.onload = () => ctx.drawImage(img, 0, 0);
+                    img.src = pagesData[pageIdx];
+                }
+            }, [pagesData]);
+
+            useEffect(() => { renderCanvas(currentPage); }, [currentPage, renderCanvas]);
+
+            const updateHistory = (newData) => {
+                const pageHistory = history[currentPage] || [pagesData[currentPage] || ""];
+                const currentIndex = historyIndex[currentPage] || 0;
+                const newHistory = pageHistory.slice(0, currentIndex + 1);
+                newHistory.push(newData);
+                setHistory(prev => ({ ...prev, [currentPage]: newHistory }));
+                setHistoryIndex(prev => ({ ...prev, [currentPage]: newHistory.length - 1 }));
+                setPagesData(prev => ({ ...prev, [currentPage]: newData }));
+            };
+
+            const undo = () => {
+                const pageHistory = history[currentPage];
+                const currentIndex = historyIndex[currentPage];
+                if (pageHistory && currentIndex > 0) {
+                    const newIndex = currentIndex - 1;
+                    setHistoryIndex(prev => ({ ...prev, [currentPage]: newIndex }));
+                    setPagesData(prev => ({ ...prev, [currentPage]: pageHistory[newIndex] }));
+                }
+            };
+
+            const redo = () => {
+                const pageHistory = history[currentPage];
+                const currentIndex = historyIndex[currentPage];
+                if (pageHistory && currentIndex < pageHistory.length - 1) {
+                    const newIndex = currentIndex + 1;
+                    setHistoryIndex(prev => ({ ...prev, [currentPage]: newIndex }));
+                    setPagesData(prev => ({ ...prev, [currentPage]: pageHistory[newIndex] }));
+                }
+            };
+
+            const handleStart = (e) => {
+                if (!isDrawingMode) return;
+                const { x, y } = getCoordinates(e);
+                const ctx = canvasRef.current.getContext("2d");
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                ctx.strokeStyle = selectedColor;
+                ctx.lineWidth = 1.5;
+                ctx.lineCap = "round";
+            };
+
+            const handleMove = (e) => {
+                if (!isDrawingMode) return;
+                const { x, y } = getCoordinates(e);
+                const ctx = canvasRef.current.getContext("2d");
+                ctx.lineTo(x, y);
+                ctx.stroke();
+            };
+
+            const handleEnd = () => { if (isDrawingMode) updateHistory(canvasRef.current.toDataURL()); };
+
+            return (
+                <div className="fixed inset-0 bg-[#050505] flex items-center justify-center p-2 font-mono">
+                    <div className="w-[360px] h-[640px] bg-[#0a0a0c] border border-[#2d2d3a] rounded-3xl shadow-[0_0_40px_rgba(0,242,255,0.05)] overflow-hidden flex flex-col">
+                        <div className="flex flex-col p-4 border-b border-[#1e1e24] bg-[#0f0f12]/80 gap-3">
+                            <div className="flex justify-between items-center">
+                                <button onClick={() => setIsDrawingMode(!isDrawingMode)} className={`w-8 h-8 rounded-lg ${isDrawingMode ? 'bg-cyan-500/20 text-cyan-400' : 'bg-[#1a1a24] text-[#444]'}`}>🖊</button>
+                                <div className="flex gap-2">
+                                    <button onClick={undo} className="w-8 h-8 rounded-lg bg-[#1a1a24] text-[#888]">↶</button>
+                                    <button onClick={redo} className="w-8 h-8 rounded-lg bg-[#1a1a24] text-[#888]">↷</button>
+                                </div>
+                            </div>
+                            <div className="flex justify-center gap-1.5">
+                                {colors.map((c) => (
+                                    <button key={c} onClick={() => setSelectedColor(c)} className={`w-6 h-6 rounded-full shadow-[inset_2px_2px_4px_rgba(0,0,0,0.5)] border-2 ${selectedColor === c ? 'border-white' : 'border-transparent'}`} style={{ backgroundColor: c }} />
+                                ))}
+                            </div>
+                        </div>
+
+                        <canvas ref={canvasRef} width={360} height={430} className="touch-none cursor-crosshair w-full" onMouseDown={handleStart} onMouseMove={handleMove} onMouseUp={handleEnd} onTouchStart={handleStart} onTouchMove={(e) => { if(isDrawingMode) e.preventDefault(); handleMove(e); }} onTouchEnd={handleEnd} />
+
+                        <div className="h-20 flex items-center justify-center gap-6 border-t border-[#1e1e24] bg-[#0f0f12] mt-auto">
+                            <button onClick={() => setCurrentPage(p => Math.max(0, p - 1))} className="w-10 h-10 rounded-full border border-[#2d2d3a] text-[#888]">◀</button>
+                            <button onClick={() => setShowSelector(true)} className="text-xl font-bold text-[#00f2ff]">{String(currentPage + 1).padStart(2, '0')}</button>
+                            <button onClick={() => setCurrentPage(p => p + 1)} className="w-10 h-10 rounded-full border border-[#2d2d3a] text-[#888]">▶</button>
+                        </div>
+                    </div>
+
+                    {showSelector && (
+                        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+                            <div className="bg-[#121216] border border-[#2d2d3a] p-6 rounded-2xl w-60 text-center">
+                                <p className="text-white mb-4 text-sm uppercase">Navigation</p>
+                                <input type="number" defaultValue={currentPage + 1} className="w-full bg-[#1a1a24] text-cyan-400 text-center p-3 rounded-lg mb-4" onChange={(e) => setCurrentPage(Math.max(0, parseInt(e.target.value) - 1))} />
+                                <button onClick={() => setShowSelector(false)} className="w-full bg-cyan-500/20 text-cyan-400 py-2 rounded-lg">CONFIRMER</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<CyberNotebookApp />);
+    </script>
+
+<script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js'));}</script>
+</body>
+</html>
