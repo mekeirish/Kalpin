@@ -5,6 +5,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Récupération du code
@@ -41,8 +43,7 @@ jobs:
             cp ../icon.png assets/icon.png
             npx @capacitor/assets generate --android
           else
-            echo "❌ icon.png introuvable à la racine du dépôt !"
-            exit 1
+            echo "⚠️ icon.png introuvable – icône par défaut utilisée"
           fi
 
       - name: Résolution des conflits de doublons Kotlin
@@ -60,8 +61,14 @@ jobs:
           cd capacitor-app/android/app/build/outputs/apk/debug/
           mv app-debug.apk Kalpin-debug.apk
 
-      - name: Sauvegarde de l'Artifact (APK)
-        uses: actions/upload-artifact@v4
+      - name: Publication de l'APK en Direct Download (Release)
+        uses: ncipollo/release-action@v1
         with:
-          name: APK-Debug
-          path: capacitor-app/android/app/build/outputs/apk/debug/Kalpin-debug.apk
+          artifacts: "capacitor-app/android/app/build/outputs/apk/debug/Kalpin-debug.apk"
+          tag: "latest"
+          name: "Kalpin Latest Build"
+          allowUpdates: true
+          removeArtifacts: true
+          replacesArtifacts: true
+          prerelease: true
+          token: ${{ secrets.GITHUB_TOKEN }}
