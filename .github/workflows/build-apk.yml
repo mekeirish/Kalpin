@@ -42,17 +42,42 @@ jobs:
           npx cap init "Kalpin" "com.brahim.kalpin" --web-dir www
           npx cap add android
 
-      - name: 🔌 Téléchargement et injection chirurgicale du Bridge
+      - name: 🔌 Téléchargement et injection chirurgicale du Bridge (split + pop)
         run: |
           cd capacitor-app/www
           MAIN_HTML=$(find . -maxdepth 1 -name "*.html" | head -n 1)
           if [ -z "$MAIN_HTML" ]; then
             echo "⚠️ Aucun fichier HTML trouvé"
           else
-            curl -s -o bridge.js "https://raw.githubusercontent.com/mekeirish/APK-Creator/main/bridge.js" || echo "⚠️ Téléchargement échoué"
+            echo "📄 Téléchargement du Bridge..."
+            curl -s -o bridge.js "https://raw.githubusercontent.com/mekeirish/APK-Creator/main/bridge.js" || {
+              echo "⚠️ Téléchargement échoué, création d'un bridge minimal"
+              cat > bridge.js << 'EOFBRIDGE'
+        (function(){
+          window.AppBridge = {
+            isNative: function(){ return !!(window.Capacitor && window.Capacitor.Plugins); },
+            haptics: {
+              vibrate: function(d){ if(navigator.vibrate) navigator.vibrate(d||200); }
+            },
+            storage: {
+              set: function(k,v){ localStorage.setItem(k,typeof v==='string'?v:JSON.stringify(v)); },
+              get: function(k){ return Promise.resolve(localStorage.getItem(k)); }
+            },
+            toast: function(msg,d){
+              var el=document.createElement('div');
+              el.textContent=msg;
+              el.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.8);color:#fff;padding:12px 24px;border-radius:12px;z-index:999;';
+              document.body.appendChild(el);
+              setTimeout(function(){ el.style.opacity='0'; setTimeout(function(){ el.remove(); },300); }, d||2000);
+            }
+          };
+        })();
+        EOFBRIDGE
+            }
             if [ -f "../node_modules/@capacitor/core/dist/capacitor.js" ]; then
               cp ../node_modules/@capacitor/core/dist/capacitor.js capacitor.js
             else
+              echo "⚠️ capacitor.js introuvable"
               touch capacitor.js
             fi
             node -e "
@@ -65,9 +90,9 @@ jobs:
                 let scripts = '<script src="capacitor.js"><\/script>\n<script src="bridge.js"><\/script>\n</body>';
                 let newContent = parts.join('</body>') + scripts + lastPart;
                 fs.writeFileSync(htmlFile, newContent, 'utf8');
-                console.log('✅ Bridge injecté chirurgicalement');
+                console.log('✅ Bridge injecté chirurgicalement à la toute fin (dernier </body>)');
               } else {
-                console.log('⚠️ Aucun </body> trouvé, injection à la fin');
+                console.log('⚠️ Aucun </body> trouvé, injection à la fin du fichier');
                 fs.appendFileSync(htmlFile, '<script src="capacitor.js"><\/script>\n<script src="bridge.js"><\/script>\n');
               }
             "
