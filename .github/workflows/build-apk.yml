@@ -29,8 +29,21 @@ jobs:
           npm init -y
           npm install @capacitor/core @capacitor/android
           npm install -D @capacitor/cli
-          npx cap init "App" "com.brahim.app" --web-dir www
+          npx cap init "Kalpin" "com.brahim.kalpin" --web-dir www
           npx cap add android
+
+      - name: Génération automatique de l'icône
+        run: |
+          cd capacitor-app
+          npm install -D @capacitor/assets
+          mkdir -p assets
+          if [ -f "../icon.png" ]; then
+            cp ../icon.png assets/icon.png
+            npx @capacitor/assets generate --android
+          else
+            echo "❌ icon.png introuvable à la racine du dépôt !"
+            exit 1
+          fi
 
       - name: Résolution des conflits de doublons Kotlin
         run: |
@@ -42,8 +55,13 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
+      - name: Renommer l'APK avec le nom du projet
+        run: |
+          cd capacitor-app/android/app/build/outputs/apk/debug/
+          mv app-debug.apk Kalpin-debug.apk
+
       - name: Sauvegarde de l'Artifact (APK)
         uses: actions/upload-artifact@v4
         with:
           name: APK-Debug
-          path: capacitor-app/android/app/build/outputs/apk/debug/app-debug.apk
+          path: capacitor-app/android/app/build/outputs/apk/debug/Kalpin-debug.apk
