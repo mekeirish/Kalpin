@@ -5,8 +5,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
       - name: Récupération du code
@@ -31,20 +29,8 @@ jobs:
           npm init -y
           npm install @capacitor/core @capacitor/android
           npm install -D @capacitor/cli
-          npx cap init "Kalpin" "com.brahim.kalpin" --web-dir www
+          npx cap init "App" "com.brahim.app" --web-dir www
           npx cap add android
-
-      - name: Génération automatique de l'icône
-        run: |
-          cd capacitor-app
-          npm install -D @capacitor/assets
-          mkdir -p assets
-          if [ -f "../icon.png" ]; then
-            cp ../icon.png assets/icon.png
-            npx @capacitor/assets generate --android
-          else
-            echo "⚠️ icon.png introuvable – icône par défaut utilisée"
-          fi
 
       - name: Résolution des conflits de doublons Kotlin
         run: |
@@ -56,19 +42,8 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: Renommer l'APK avec le nom du projet
-        run: |
-          cd capacitor-app/android/app/build/outputs/apk/debug/
-          mv app-debug.apk Kalpin-debug.apk
-
-      - name: Publication de l'APK en Direct Download (Release)
-        uses: ncipollo/release-action@v1
+      - name: Sauvegarde de l'Artifact (APK)
+        uses: actions/upload-artifact@v4
         with:
-          artifacts: "capacitor-app/android/app/build/outputs/apk/debug/Kalpin-debug.apk"
-          tag: "latest"
-          name: "Kalpin Latest Build"
-          allowUpdates: true
-          removeArtifacts: true
-          replacesArtifacts: true
-          prerelease: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+          name: APK-Debug
+          path: capacitor-app/android/app/build/outputs/apk/debug/app-debug.apk
